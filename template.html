@@ -1,0 +1,70 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tıp Çalışma Merkezi – Çıkmış Sorular</title>
+<style>
+:root{--bg:#f6f7f9;--fg:#1b2430;--card:#fff;--mut:#667085;--ac:#0f766e;--bd:#dde1e7;--ok:#e6f6ee;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10151c;--fg:#e8ecf1;--card:#18202a;--mut:#9aa5b4;--ac:#2dd4bf;--bd:#2b3644;--ok:#12332b;color-scheme:dark}}
+html{height:100%}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--bd);background:var(--card)}h1{font-size:18px;margin:0}header small{color:var(--mut)}
+main{max-width:900px;margin:0 auto;padding:12px}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+input[type=search]{width:100%;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:inherit}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
+details{border:1px solid var(--bd);border-radius:10px;background:var(--bg)}summary{padding:10px;cursor:pointer;font-size:14px}
+details .l{max-height:220px;overflow:auto;padding:4px 10px 10px}label.c{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:14px}
+button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer;min-height:44px}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.q{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+.meta{font-size:12px;color:var(--mut);margin-bottom:6px}.stem{font-weight:600;margin:4px 0 8px}
+.o{padding:5px 8px;border-radius:8px}.o.ok{background:var(--ok);font-weight:600}.badge{font-size:11px;border:1px solid var(--bd);border-radius:6px;padding:1px 6px;margin-left:4px}
+.empty{text-align:center;color:var(--mut);padding:30px}select{padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font:inherit}
+.note{font-size:12px;color:var(--mut)}
+</style></head><body>
+<header><h1>Tıp Çalışma Merkezi · Çıkmış Sorular</h1><small id="cnt"></small></header>
+<main>
+<div class="panel"><input type="search" id="kw" placeholder="Anahtar kelime ara (soru kökü ve şıklarda)">
+<div class="fl" id="fl"></div>
+<div class="row"><button id="clr">Filtreleri temizle</button><button id="selAll">Sonuçların hepsini seç</button><button id="selNone">Seçimi kaldır</button>
+<label class="c"><input type="checkbox" id="showAns"> Cevapları göster</label></div></div>
+<div class="panel"><b>PDF indir</b>
+<div class="row"><select id="scope"><option value="f">Filtrelenen tüm sorular</option><option value="s">Yalnızca seçilenler</option></select>
+<select id="mode"><option value="key">Cevap anahtarlı</option><option value="nokey">Cevap anahtarsız</option><option value="exam">Sınav formatı (boşluklu)</option></select>
+<button class="p" id="pdf">PDF oluştur</button></div>
+<div class="note">Açılan pencerede “PDF olarak kaydet / Yazdır → PDF” seçin. Kaynakta açıklama bulunmadığından “açıklamalı” seçenek yoktur.</div></div>
+<div id="list"></div><div class="row" style="justify-content:center"><button id="more" hidden>Daha fazla göster</button></div>
+</main>
+<script>
+const Q=__DATA__;
+const F={exam_year:new Set(),hoca:new Set(),donem:new Set(),kurul:new Set()};
+const names={exam_year:"Yıl",hoca:"Hoca",donem:"Dönem",kurul:"Kurul"};
+const sel=new Set();let shown=50,res=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const tr=s=>(s||"").toLocaleLowerCase("tr");
+function build(){const fl=$("fl");fl.innerHTML="";for(const k in F){const vals=[...new Set(Q.map(q=>q[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"tr"));
+ if(!vals.length)continue;const d=document.createElement("details");d.innerHTML=`<summary>${names[k]} <span class="badge" id="b_${k}"></span></summary><div class="l"></div>`;
+ const l=d.querySelector(".l");vals.forEach(v=>{const n=Q.filter(q=>q[k]===v).length;const lb=document.createElement("label");lb.className="c";
+ lb.innerHTML=`<input type="checkbox"><span>${esc(v)} <small class="note">(${n})</small></span>`;lb.firstChild.onchange=e=>{e.target.checked?F[k].add(v):F[k].delete(v);shown=50;render()};l.appendChild(lb)});fl.appendChild(d)}}
+function filt(){const w=tr($("kw").value).trim();return Q.filter(q=>{for(const k in F)if(F[k].size&&!F[k].has(q[k]))return false;
+ if(w&&!tr(q.stem+" "+Object.values(q.options).join(" ")).includes(w))return false;return true})}
+function qhtml(q){const ans=$("showAns").checked;const os=Object.entries(q.options).map(([k,v])=>`<div class="o ${ans&&q.answer===k?"ok":""}"><b>${k})</b> ${esc(v)}</div>`).join("");
+ const open=!os&&ans&&q.answer_text?`<div class="o ok">Cevap: ${esc(q.answer_text)}</div>`:"";
+ return `<div class="q"><label class="c"><input type="checkbox" data-id="${q.id}" ${sel.has(q.id)?"checked":""}><span class="meta">${esc(q.exam_year)} · ${esc(q.hoca||"Hoca belirtilmemiş")} · ${esc(q.source_pdf)} s.${q.source_page}${q.iptal_edildi?'<span class="badge">iptal edildi</span>':""}${q.status!=="parsed"?'<span class="badge">gözden geçirilecek</span>':""}</span></label>
+ <div class="stem">${esc(q.stem)}</div>${os}${open}${ans&&!q.answer&&!q.answer_text?'<div class="note">Kaynakta cevap anahtarı yok.</div>':""}</div>`}
+function render(){res=filt();for(const k in F){const b=$("b_"+k);if(b)b.textContent=F[k].size||""}
+ $("cnt").textContent=`${res.length} / ${Q.length} soru · ${sel.size} seçili`;
+ $("list").innerHTML=res.length?res.slice(0,shown).map(qhtml).join(""):'<div class="empty">Bu filtrelere uyan soru bulunamadı.</div>';
+ $("more").hidden=res.length<=shown;$("list").querySelectorAll("input[data-id]").forEach(i=>i.onchange=e=>{e.target.checked?sel.add(i.dataset.id):sel.delete(i.dataset.id);$("cnt").textContent=`${res.length} / ${Q.length} soru · ${sel.size} seçili`})}
+$("kw").oninput=()=>{shown=50;render()};$("showAns").onchange=render;$("more").onclick=()=>{shown+=50;render()};
+$("clr").onclick=()=>{$("kw").value="";for(const k in F)F[k].clear();build();shown=50;render()};
+$("selAll").onclick=()=>{res.forEach(q=>sel.add(q.id));render()};$("selNone").onclick=()=>{sel.clear();render()};
+$("pdf").onclick=()=>{let L=$("scope").value==="s"?Q.filter(q=>sel.has(q.id)):res;if(!L.length){alert($("scope").value==="s"?"Önce soru seçin.":"İndirilecek soru yok.");return}
+ const m=$("mode").value;const body=L.map((q,i)=>{const o=Object.entries(q.options).map(([k,v])=>`<div class="o"><b>${k})</b> ${esc(v)}${m==="key"&&q.answer===k?" <b>✓</b>":""}</div>`).join("");
+ const blank=m==="exam"?'<div class="bl">Cevap: ______ &nbsp; Notlar: ______________________________</div>':"";
+ const oa=!o&&m==="key"&&q.answer_text?`<div class="o"><b>Cevap:</b> ${esc(q.answer_text)}</div>`:"";
+ return `<div class="pq"><div class="m">${i+1}. · ${esc(q.exam_year)} · ${esc(q.hoca||"")} · ${esc(q.source_pdf)} s.${q.source_page}</div><div class="s">${esc(q.stem)}</div>${o}${oa}${blank}</div>`}).join("");
+ const key=m==="key"?`<h2>Cevap anahtarı</h2><p>${L.map((q,i)=>`${i+1}-${q.answer||"?"}`).join(" &nbsp; ")}</p><p class="m">“?” = kaynakta cevap anahtarı yok.</p>`:"";
+ const w=window.open("","_blank");if(!w){alert("Açılır pencere engellendi; izin verin.");return}
+ w.document.write(`<!doctype html><meta charset=utf-8><title>Tıp Çalışma Merkezi – ${L.length} soru</title><style>body{font:13pt/1.4 Georgia,"Times New Roman",serif;margin:18mm}h1{font-size:18pt}.pq{break-inside:avoid;margin:0 0 12pt}.s{font-weight:bold;margin:2pt 0}.o{margin-left:12pt}.m{font:9pt sans-serif;color:#555}.bl{margin-top:8pt;font:10pt sans-serif}@page{margin:14mm}</style><h1>Tıp Çalışma Merkezi – Çıkmış Sorular</h1><div class=m>${L.length} soru · ${m==="exam"?"Sınav formatı":m==="key"?"Cevap anahtarlı":"Cevap anahtarsız"}</div><hr>${body}${key}<script>onload=()=>setTimeout(()=>print(),300)<\/script>`);w.document.close()};
+build();render();
+</script></body></html>
